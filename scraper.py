@@ -1,13 +1,9 @@
 '''
-Quick Web Scraper
+Song Information Web Scraper
 
 Piero Orderique
-20 Jan 2021
-
-Quick Web Scraper returns a list of everything on a website
-that is associated with an id or class. Very simple and 
-straight forward program for the "quick webscraper" who 
-just wants a list of all Xs included on one site.
+STS.005 Data and Society
+25 Feb 2022
 '''
 from colorama import Fore
 import time
@@ -24,7 +20,7 @@ def log_print(*message, color=Fore.CYAN):
     print(color + "[SongGenreScraper]:", *message, end="")
     print(Fore.WHITE + "")
 
-class SongGenreScraper():
+class SongInfoScraper():
 
     WEBSITE = "https://www.chosic.com/music-genre-finder/"
     DRIVER_PATH = "C:\\Users\\fabri\\Downloads\\chromedriver_win32\\chromedriver.exe"
@@ -134,12 +130,11 @@ def main():
         ('Deja Vu', "Olivia Rodrigo"),
     ]
 
-    scraper = SongGenreScraper(songs)
+    scraper = SongInfoScraper(songs)
 
     for (title, artist) in songs:
         s = scraper.get_song_info(title, artist)
         print(s)
-
 
 
 if __name__ == "__main__":
