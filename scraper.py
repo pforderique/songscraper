@@ -47,7 +47,9 @@ class SongGenreScraper():
         self._search_song(title, artist)
 
         # get album name
-        year = 3
+        year = (self.driver.find_element(By.CLASS_NAME, "album-data")
+                .get_attribute("innerHTML")[-5:-1])
+        log_print(year, color=Fore.GREEN)
 
         # get list of genre tags
         tag_containers = self.driver.find_elements(By.XPATH, '//div[@class="pl-tags tagcloud"]')
@@ -57,10 +59,27 @@ class SongGenreScraper():
         genre_tags = [tag.get_attribute('innerHTML') for tag in tag_elems]
         log_print(genre_tags, color=Fore.GREEN)
 
+        # get metrics
+        raw_metrics = (self.driver.find_element(By.CLASS_NAME, "progressbars-div")
+                    .get_attribute("textContent")
+                    .split(" "))
+        raw_metrics = list(filter(lambda x: x != "", raw_metrics))
+        assert(len(raw_metrics) % 2 == 0, "you got something else bro")
+
+        metrics = {}
+        for idx in range(0, len(raw_metrics), 2):
+            category, score = (
+                raw_metrics[idx][:-1],
+                raw_metrics[idx+1][:-4]
+            )
+            metrics[category] = score
+
+        log_print(metrics, color=Fore.GREEN)
 
         return {
+            "Date Released": year,
             "Genres": ",".join(genre_tags),
-
+            # "Tempo": ,
         }
 
     def _search_song(self, title, artist):
