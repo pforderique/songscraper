@@ -9,18 +9,18 @@ that is associated with an id or class. Very simple and
 straight forward program for the "quick webscraper" who 
 just wants a list of all Xs included on one site.
 '''
+from colorama import Fore
 import time
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
-
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from colorama import Fore
+
+DEBUG_MODE = True
 
 def log_print(*message, color=Fore.CYAN):
+    if not DEBUG_MODE: return
     print(color + "[SongGenreScraper]:", *message, end="")
     print(Fore.WHITE + "")
 
@@ -59,12 +59,19 @@ class SongGenreScraper():
         genre_tags = [tag.get_attribute('innerHTML') for tag in tag_elems]
         log_print(genre_tags, color=Fore.GREEN)
 
+        # get tempo
+        tempo = int(self.driver.find_element(By.CLASS_NAME, "tempo-duration-first")
+                    .find_elements(By.TAG_NAME, "span")[1]
+                    .get_attribute("innerHTML")
+                    .split(" ")[1])
+        log_print(tempo, color=Fore.GREEN)
+
         # get metrics
         raw_metrics = (self.driver.find_element(By.CLASS_NAME, "progressbars-div")
                     .get_attribute("textContent")
                     .split(" "))
         raw_metrics = list(filter(lambda x: x != "", raw_metrics))
-        assert(len(raw_metrics) % 2 == 0, "you got something else bro")
+        assert len(raw_metrics) % 2 == 0, "you got something else bro"
 
         metrics = {}
         for idx in range(0, len(raw_metrics), 2):
@@ -79,7 +86,8 @@ class SongGenreScraper():
         return {
             "Date Released": year,
             "Genres": ",".join(genre_tags),
-            # "Tempo": ,
+            "Tempo": tempo,
+            **metrics
         }
 
     def _search_song(self, title, artist):
@@ -126,7 +134,8 @@ def main():
     ]
 
     scraper = SongGenreScraper(songs)
-    scraper.get_song_info(songs[0][0], songs[0][1])
+    s = scraper.get_song_info(songs[0][0], songs[0][1])
+    log_print(s)
 
 
 
