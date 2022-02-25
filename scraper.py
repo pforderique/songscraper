@@ -17,7 +17,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 def log_print(*message, color=Fore.CYAN):
     if not DEBUG_MODE: return
@@ -29,7 +29,7 @@ class SongGenreScraper():
     WEBSITE = "https://www.chosic.com/music-genre-finder/"
     DRIVER_PATH = "C:\\Users\\fabri\\Downloads\\chromedriver_win32\\chromedriver.exe"
     DRIVER_TIMEOUT = 10
-    PAUSE_TIME = 2 # needed to avoid checking elements before page load
+    PAUSE_TIME = 1.2 # needed to avoid checking elements before page load
 
     def __init__(self, all_songs) -> None:
         options = webdriver.ChromeOptions()
@@ -56,7 +56,7 @@ class SongGenreScraper():
         tag_elems = [] 
         [tag_elems.extend(tag_container.find_elements(By.TAG_NAME, "a")) \
             for tag_container in tag_containers]
-        genre_tags = [tag.get_attribute('innerHTML') for tag in tag_elems]
+        genre_tags = list({tag.get_attribute('innerHTML') for tag in tag_elems})
         log_print(genre_tags, color=Fore.GREEN)
 
         # get tempo
@@ -129,13 +129,16 @@ class SongGenreScraper():
 def main():
     # mock data
     songs = [
-        ('Beyond the Sea', "Bobby Darin"),
-        ('Vienna', "Billy Joel"),
+        # ('Beyond the Sea', "Bobby Darin"),
+        # ('Vienna', "Billy Joel"),
+        ('Deja Vu', "Olivia Rodrigo"),
     ]
 
     scraper = SongGenreScraper(songs)
-    s = scraper.get_song_info(songs[0][0], songs[0][1])
-    log_print(s)
+
+    for (title, artist) in songs:
+        s = scraper.get_song_info(title, artist)
+        print(s)
 
 
 
