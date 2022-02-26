@@ -5,29 +5,30 @@ Piero Orderique
 STS.005 Data and Society
 25 Feb 2022
 '''
+from collections import defaultdict
 from colorama import Fore
 import time
 
+import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 def log_print(*message, color=Fore.CYAN):
     if not DEBUG_MODE: return
-    print(color + "[SongGenreScraper]:", *message, end="")
+    print(color + "[SongInfoScraper]:", *message, end="")
     print(Fore.WHITE + "")
 
 class SongInfoScraper():
 
     WEBSITE = "https://www.chosic.com/music-genre-finder/"
-    DRIVER_PATH = "C:\\Users\\fabri\\Downloads\\chromedriver_win32\\chromedriver.exe"
     DRIVER_TIMEOUT = 10
     PAUSE_TIME = 1.2 # needed to avoid checking elements before page load
 
-    def __init__(self, all_songs) -> None:
+    def __init__(self) -> None:
         options = webdriver.ChromeOptions()
         options.add_argument("--disable-blink-features=AutomationControlled")
 
@@ -35,8 +36,7 @@ class SongInfoScraper():
             service=Service(ChromeDriverManager().install()),
             options=options
         )
-        self.driver.implicitly_wait(SongGenreScraper.DRIVER_TIMEOUT)
-        self.all_songs = all_songs
+        self.driver.implicitly_wait(SongInfoScraper.DRIVER_TIMEOUT)
         self._open()
 
     def get_song_info(self, title, artist):
@@ -97,9 +97,9 @@ class SongInfoScraper():
             song_id = song_dropdown.get_attribute("data-song-id")
             log_print("Song id is", song_id)
 
-            self.driver.get(SongGenreScraper.WEBSITE + f"?track={song_id}")
+            self.driver.get(SongInfoScraper.WEBSITE + f"?track={song_id}")
             log_print("song clicked on dropdown")
-            time.sleep(SongGenreScraper.PAUSE_TIME)
+            time.sleep(SongInfoScraper.PAUSE_TIME)
 
         except Exception as e:
             log_print("Did not find element. Restarting...", color=Fore.RED)
@@ -110,31 +110,59 @@ class SongInfoScraper():
         self._close()
         self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         self._open()
-        self.driver.get(SongGenreScraper.WEBSITE)
+        self.driver.get(SongInfoScraper.WEBSITE)
 
     def _open(self):
-        self.driver.get(SongGenreScraper.WEBSITE)
-        log_print(f"OPENED {SongGenreScraper.WEBSITE}")
-        time.sleep(SongGenreScraper.PAUSE_TIME)
+        self.driver.get(SongInfoScraper.WEBSITE)
+        log_print(f"OPENED {SongInfoScraper.WEBSITE}")
+        time.sleep(SongInfoScraper.PAUSE_TIME)
 
     def _close(self):
         log_print(f"Exiting driver.")
         self.driver.close()
 
 
+def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv"):
+    """ 
+    Given a CLEANED (no weird characters, no null entries in title or artist)
+    dataset containing a 'Title' and 'Artist' column, creates a NEW dataset 
+    containing all columns in input dataset plus those produced by `get_song_info`
+    method in SongInfoScraper
+    """
+    cleaned_dataset = pd.read_csv(dataset_path)
+    scraper = SongInfoScraper()
+
+    new_columns = defaultdict(lambda: [])
+    total_songs = len(cleaned_dataset)
+
+    # fill in new columns
+    for (idx, row) in cleaned_dataset.iterrows():
+        song_title, song_artist = row['Title'], row['Artist']
+        log_print(f"On song {idx + 1}/{total_songs}: {song_title}, {song_artist}")
+
+        for (metric, value) in scraper.get_song_info(song_title, song_artist).items():
+            new_columns[metric].append(value)
+
+    log_print(f"new columns created!", color=Fore.LIGHTGREEN_EX)
+
+    # save results just in case!
+    import json
+    with open('./data/generated_columns.json', 'w') as fp:
+        json.dump(new_columns, fp)
+
+
+    # append columns to dataframe
+    for (column_name, column_data) in new_columns.items():
+        cleaned_dataset[column_name] = column_data
+
+    cleaned_dataset.to_csv(output_path)
+    log_print(f"COMPLETE DATASET CREATED.", color=Fore.LIGHTGREEN_EX)
+
+
 def main():
-    # mock data
-    songs = [
-        # ('Beyond the Sea', "Bobby Darin"),
-        # ('Vienna', "Billy Joel"),
-        ('Deja Vu', "Olivia Rodrigo"),
-    ]
-
-    scraper = SongInfoScraper(songs)
-
-    for (title, artist) in songs:
-        s = scraper.get_song_info(title, artist)
-        print(s)
+    # CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
+    CLEAN_DATA_PATH = './data/test_cleaned.csv'
+    create_full_dataset(dataset_path=CLEAN_DATA_PATH)
 
 
 if __name__ == "__main__":
