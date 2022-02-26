@@ -33,7 +33,11 @@ class SongInfoScraper():
         self._open()
 
     def get_song_info(self, title, artist):
-        self._search_song(title, artist)
+        if not self._search_song(title, artist):
+            raise Exception("Failing to open to song page (missing element)")
+
+        # pause here for a bit to let page fully load
+        time.sleep(SongInfoScraper.PAUSE_TIME)
 
         # get album name
         year = (self.driver.find_element(By.CLASS_NAME, "album-data")
@@ -81,7 +85,10 @@ class SongInfoScraper():
 
     def _search_song(self, title, artist):
         search_box = self.driver.find_element(By.ID, "search-word")
-        search_box.send_keys(title + " - " + artist)
+
+        # try only typing the title of the song
+        # search_box.send_keys(title + " - " + artist)
+        search_box.send_keys(title)
 
         log_print("song typed into input")
         
@@ -91,13 +98,18 @@ class SongInfoScraper():
             log_print("Song id is", song_id)
 
             self.driver.get(SongInfoScraper.WEBSITE + f"?track={song_id}")
-            log_print("song clicked on dropdown")
-            time.sleep(SongInfoScraper.PAUSE_TIME)
+            log_print("song page opened for scraping")
 
         except Exception as e:
-            log_print("Did not find element. Restarting...", color=Fore.RED)
-            self._restart()
-            self.get_song_info(title, artist)
+            log_print("Could not open to song info", color=Fore.RED)
+            # instead of restarting, just reload page
+            self.driver.get(SongInfoScraper.WEBSITE)
+
+            # self._restart()
+            # self.get_song_info(title, artist)
+            return False
+
+        return True
 
     def _restart_driver(self):
         options = webdriver.ChromeOptions()
@@ -140,14 +152,25 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
     # fill in new columns
     for (idx, row) in cleaned_dataset.iterrows():
         song_title, song_artist = row['Title'], row['Artist']
-        log_print(f"On song {idx + 1}/{total_songs}: {song_title}, {song_artist}")
+        log_print(f"On song {idx}/{total_songs-1}: {song_title}, {song_artist}")
 
         try:
-            for (metric, value) in scraper.get_song_info(song_title, song_artist).items():
-                new_columns[metric].append(value)
+            song_dict = scraper.get_song_info(song_title, song_artist)
 
         except Exception as e:
-            log_print(f"Received an error on song {idx}: {song_title}\n{e}", color=Fore.YELLOW)
+            # stash null values
+            for metric in {
+                "Date Released", "Genres","Tempo",'Popularity', 'Happiness', 
+                'Danceability', 'Energy', 'Acousticness', 'Instrumentalness', 
+                'Liveness', 'Speechiness'}:
+
+                new_columns[metric].append(None)
+
+            log_print(f"Received an error on song {idx}: {song_title} | proceeding...", color=Fore.YELLOW)
+
+        else:
+            for (metric, value) in song_dict.items():
+                new_columns[metric].append(value)
 
     log_print(f"new columns created!", color=Fore.LIGHTGREEN_EX)
 
@@ -166,8 +189,8 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
 
 
 def main():
-    CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
-    # CLEAN_DATA_PATH = './data/test_cleaned.csv'
+    # CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
+    CLEAN_DATA_PATH = './data/test_cleaned.csv'
     create_full_dataset(dataset_path=CLEAN_DATA_PATH)
 
 
