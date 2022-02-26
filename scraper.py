@@ -29,14 +29,7 @@ class SongInfoScraper():
     PAUSE_TIME = 1.2 # needed to avoid checking elements before page load
 
     def __init__(self) -> None:
-        options = webdriver.ChromeOptions()
-        options.add_argument("--disable-blink-features=AutomationControlled")
-
-        self.driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
-        self.driver.implicitly_wait(SongInfoScraper.DRIVER_TIMEOUT)
+        self._restart_driver()
         self._open()
 
     def get_song_info(self, title, artist):
@@ -106,11 +99,20 @@ class SongInfoScraper():
             self._restart()
             self.get_song_info(title, artist)
 
+    def _restart_driver(self):
+        options = webdriver.ChromeOptions()
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--window-size=1000,800")
+        self.driver = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=options
+        )
+        self.driver.implicitly_wait(SongInfoScraper.DRIVER_TIMEOUT)
+
     def _restart(self):
         self._close()
-        self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        self._restart_driver()
         self._open()
-        self.driver.get(SongInfoScraper.WEBSITE)
 
     def _open(self):
         self.driver.get(SongInfoScraper.WEBSITE)
@@ -140,8 +142,12 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
         song_title, song_artist = row['Title'], row['Artist']
         log_print(f"On song {idx + 1}/{total_songs}: {song_title}, {song_artist}")
 
-        for (metric, value) in scraper.get_song_info(song_title, song_artist).items():
-            new_columns[metric].append(value)
+        try:
+            for (metric, value) in scraper.get_song_info(song_title, song_artist).items():
+                new_columns[metric].append(value)
+
+        except Exception as e:
+            log_print(f"Received an error on song {idx}: {song_title}\n{e}", color=Fore.YELLOW)
 
     log_print(f"new columns created!", color=Fore.LIGHTGREEN_EX)
 
@@ -160,8 +166,8 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
 
 
 def main():
-    # CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
-    CLEAN_DATA_PATH = './data/test_cleaned.csv'
+    CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
+    # CLEAN_DATA_PATH = './data/test_cleaned.csv'
     create_full_dataset(dataset_path=CLEAN_DATA_PATH)
 
 
