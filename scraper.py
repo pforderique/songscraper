@@ -87,9 +87,7 @@ class SongInfoScraper():
         search_box = self.driver.find_element(By.ID, "search-word")
 
         # try only typing the title of the song
-        # search_box.send_keys(title + " - " + artist)
         search_box.send_keys(title)
-
         log_print("song typed into input")
         
         try:
@@ -102,11 +100,10 @@ class SongInfoScraper():
 
         except Exception as e:
             log_print("Could not open to song info", color=Fore.RED)
-            # instead of restarting, just reload page
-            self.driver.get(SongInfoScraper.WEBSITE)
 
-            # self._restart()
-            # self.get_song_info(title, artist)
+            # instead of restarting, just reload page
+            self.reload()
+
             return False
 
         return True
@@ -120,6 +117,9 @@ class SongInfoScraper():
             options=options
         )
         self.driver.implicitly_wait(SongInfoScraper.DRIVER_TIMEOUT)
+
+    def reload(self):
+        self.driver.get(SongInfoScraper.WEBSITE)
 
     def _restart(self):
         self._close()
@@ -167,6 +167,7 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
                 new_columns[metric].append(None)
 
             log_print(f"Received an error on song {idx}: {song_title} | proceeding...", color=Fore.YELLOW)
+            scraper.reload()
 
         else:
             for (metric, value) in song_dict.items():
@@ -189,8 +190,8 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
 
 
 def main():
-    # CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
-    CLEAN_DATA_PATH = './data/test_cleaned.csv'
+    CLEAN_DATA_PATH = './data/cleaned_dataset.csv'
+    # CLEAN_DATA_PATH = './data/test_cleaned.csv'
     create_full_dataset(dataset_path=CLEAN_DATA_PATH)
 
 
