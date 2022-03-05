@@ -16,10 +16,11 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 DEBUG_MODE = True
+START_TIME = time.time()
 
 def log_print(*message, color=Fore.CYAN):
     if not DEBUG_MODE: return
-    print(color + "[SongInfoScraper]:", *message, end="")
+    print(color + f"[SongInfoScraper | {(time.time() - START_TIME)/60:.2f}m]:", *message, end="")
     print(Fore.WHITE + "")
 
 class SongInfoScraper():
@@ -31,6 +32,7 @@ class SongInfoScraper():
     def __init__(self) -> None:
         self._restart_driver()
         self._open()
+        self.appendArtist = True
 
     def get_song_info(self, title, artist):
         if not self._search_song(title, artist):
@@ -42,7 +44,7 @@ class SongInfoScraper():
         # get album name
         year = (self.driver.find_element(By.CLASS_NAME, "album-data")
                 .get_attribute("innerHTML")[-5:-1])
-        log_print(year, color=Fore.GREEN)
+        # log_print(year, color=Fore.GREEN)
 
         # get list of genre tags
         tag_containers = self.driver.find_elements(By.XPATH, '//div[@class="pl-tags tagcloud"]')
@@ -50,14 +52,14 @@ class SongInfoScraper():
         [tag_elems.extend(tag_container.find_elements(By.TAG_NAME, "a")) \
             for tag_container in tag_containers]
         genre_tags = list({tag.get_attribute('innerHTML') for tag in tag_elems})
-        log_print(genre_tags, color=Fore.GREEN)
+        # log_print(genre_tags, color=Fore.GREEN)
 
         # get tempo
         tempo = int(self.driver.find_element(By.CLASS_NAME, "tempo-duration-first")
                     .find_elements(By.TAG_NAME, "span")[1]
                     .get_attribute("innerHTML")
                     .split(" ")[1])
-        log_print(tempo, color=Fore.GREEN)
+        # log_print(tempo, color=Fore.GREEN)
 
         # get metrics
         raw_metrics = (self.driver.find_element(By.CLASS_NAME, "progressbars-div")
@@ -87,25 +89,36 @@ class SongInfoScraper():
         search_box = self.driver.find_element(By.ID, "search-word")
 
         # try only typing the title of the song
-        search_box.send_keys(title)
-        log_print("song typed into input")
+        if self.appendArtist:
+            search_box.send_keys(title + "," + artist)
+        else:
+            search_box.send_keys(title)
+        # log_print("song typed into input")
         
         try:
             song_dropdown = self.driver.find_element(By.CLASS_NAME, "span-class")
             song_id = song_dropdown.get_attribute("data-song-id")
-            log_print("Song id is", song_id)
+            # log_print("Song id is", song_id)
 
             self.driver.get(SongInfoScraper.WEBSITE + f"?track={song_id}")
-            log_print("song page opened for scraping")
+            # log_print("song page opened for scraping")
 
         except Exception as e:
             log_print("Could not open to song info", color=Fore.RED)
 
-            # instead of restarting, just reload page
-            self.reload()
+            # if failed with appending artist, try again with just the title
+            if self.appendArtist:
+                self.appendArtist = False
+                self.reload()
+                self._search_song(title, artist)
 
-            return False
+            else:
+                # instead of restarting, just reload page
+                self.reload()
+                self.appendArtist = True
+                return False
 
+        self.appendArtist = True
         return True
 
     def _restart_driver(self):
@@ -149,13 +162,19 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
     new_columns = defaultdict(lambda: [])
     total_songs = len(cleaned_dataset)
 
+    cache = {}
+
     # fill in new columns
     for (idx, row) in cleaned_dataset.iterrows():
         song_title, song_artist = row['Title'], row['Artist']
         log_print(f"On song {idx}/{total_songs-1}: {song_title}, {song_artist}")
 
         try:
-            song_dict = scraper.get_song_info(song_title, song_artist)
+            if song_title in cache:
+                log_print(f"Found song in cache! skipping...", color=Fore.LIGHTCYAN_EX)
+                song_dict = cache[song_title]
+            else:
+                song_dict = scraper.get_song_info(song_title, song_artist)
 
         except Exception as e:
             # stash null values
@@ -170,14 +189,15 @@ def create_full_dataset(dataset_path, output_path="./data/complete_dataset.csv")
             scraper.reload()
 
         else:
+            # add song to cache!
+            cache[song_title] = song_dict
+
             for (metric, value) in song_dict.items():
                 new_columns[metric].append(value)
 
-    log_print(f"new columns created!", color=Fore.LIGHTGREEN_EX)
-
-    # save results just in case!
+    # save results in cache!
     import json
-    with open('./data/generated_columns.json', 'w') as fp:
+    with open('./data/cache.json', 'w') as fp:
         json.dump(new_columns, fp)
 
 
